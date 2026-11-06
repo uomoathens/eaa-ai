@@ -9,7 +9,7 @@ Reference implementation of the Explainable Accountability-Aware AI Architecture
 
 > Sargiotis, D. (2026). *Empathy in Algorithms: Shaping Ethical AI for a Just and Inclusive Society*. Springer Nature. §8.4 (EAA-AI) and §9.4 (XAI-AAI). https://doi.org/10.1007/978-3-032-32128-2
 
-The repository turns the architecture into runnable, testable software and extends it with five refinements aimed at the high-risk obligations of the EU AI Act (Regulation (EU) 2024/1689), which apply to stand-alone Annex III systems from 2 December 2027 following the Digital Omnibus on AI.
+Building on the architecture defined in the book, the repository develops it into runnable, testable software and extends it along five operational directions aimed at the high-risk obligations of the EU AI Act (Regulation (EU) 2024/1689), which apply to stand-alone Annex III systems from 2 December 2027 following the Digital Omnibus on AI.
 
 ## What it does
 
@@ -38,9 +38,11 @@ The learner is a fairness-regularised logistic regression with the governance lo
 L_{\text{total}} = L_{\text{task}} + \lambda L_{\text{fair}} + \beta L_{\text{explain}}
 ```
 
-## Refinements over the published formulation
+## Operational extensions
 
-**1. Attribution moved out of the parameter arithmetic.** The book writes $`\theta^{*} = \theta_{0} + \sum_{t} \Delta_{t} \cdot I_{d_t}`$, in which an indicator would zero out unattributed updates. Here the parameters evolve as $`\theta^{*} = \theta_{0} + \sum_{t} \Delta_{t}`$ and attribution lives in a hash-chained ledger:
+The book defines the architecture, its layers and its mathematical core. The extensions below build on that foundation to carry it into day-to-day operation under the EU AI Act; each one starts from a component of the book and adds what a deployed system needs around it.
+
+**1. A tamper-evident ledger for the traceable optimisation path.** The book introduces the traceable parameter optimisation path $`\theta^{*} = \theta_{0} + \sum_{t} \Delta_{t} \cdot I_{d_t}`$, which ties every parameter update to the contributor responsible for it. In software, each update $`\Delta_t`$ and its attribution $`d_t`$ are written as separate fields of a hash-chained ledger, so that the attribution record can be verified independently of the model:
 
 ```math
 \mathcal{L}_{\text{audit}} = \left\{ \left( t,\ h(\Delta_t),\ d_t,\ h(\mathcal{D}_t),\ C_{\text{ethics}}(\theta_t) \right) \right\}_{t=1}^{T}, \quad h_t = H\left(h_{t-1} \,\|\, \text{record}_t\right)
@@ -48,7 +50,7 @@ L_{\text{total}} = L_{\text{task}} + \lambda L_{\text{fair}} + \beta L_{\text{ex
 
 Any edited, inserted or deleted record breaks verification (AI Act, Article 12).
 
-**2. Continuous compliance penalty and hard deployment gate.** The binary bonus $`\gamma_2 C_{\text{ethics}}`$ rewards barely crossing a threshold and is blind to the size of a violation. Both rewards are computed and logged; the refined one is
+**2. A graded compliance signal alongside the ethical compliance constraint.** The book's Responsible AI reward combines task utility, bias and the ethical compliance constraint $`C_{\text{ethics}}`$. Both the reward as defined in the book and a graded variant, which also measures how far each requirement is from its threshold, are computed and logged:
 
 ```math
 R(s_t,a_t) = U_{\text{task}}(a_t) - \gamma_1 L_{\text{bias}}(a_t) - \gamma_2 \sum_{m} \max\left(0,\ \tau_m - m(\theta_t)\right)
@@ -60,13 +62,13 @@ and deployment requires $`\min_m (m(\theta_t) - \tau_m) \ge 0`$ on held-out data
 
 **4. Role-based accountability.** Records are attributed to AI Act roles (`provider`, `deployer`, `oversight-board`) and organisational units rather than to individual engineers. Human oversight (Article 14) is a separate, signed ledger event.
 
-**5. Fairness only as strong as needed, chosen with statistical confidence.** The book fixes the fairness weight $`\lambda`$. Here a grid of weights is trained and the **smallest** $`\lambda`$ is selected whose validation metrics clear every requirement at the 95% one-sided bootstrap confidence level:
+**5. Data-driven calibration of the fairness weight.** The book's governance loss balances accuracy and fairness through the weight $`\lambda`$. For a given deployment, a grid of weights is trained and the **smallest** $`\lambda`$ is selected whose validation metrics clear every requirement at the 95% one-sided bootstrap confidence level:
 
 ```math
 \lambda^{*} = \min \left\{ \lambda \in \Lambda \ :\ \min_{m} \left( Q_{0.05}\big(m_{\lambda}\big) - \tau_m \right) \ge 0 \right\}
 ```
 
-for requirements of the form $`m \ge \tau_m`$, with the upper quantile used for requirements of the form $`m \le \tau_m`$. If no weight qualifies, the candidate closest to qualifying is selected and the shortfall is recorded. Every candidate, its confidence margins and the reason for the choice are written to the ledger. This guards against two failure modes observed while building the repository: applying a strong constraint where no bias exists, which can move decisions the wrong way, and selecting a weight on the strength of validation noise.
+for requirements of the form $`m \ge \tau_m`$, with the upper quantile used for requirements of the form $`m \le \tau_m`$. If no weight qualifies, the candidate closest to qualifying is selected and the shortfall is recorded. Every candidate, its confidence margins and the reason for the choice are written to the ledger. Calibrating $`\lambda`$ to the data in this way applies as much fairness pressure as each dataset requires, and keeps the choice robust to sampling noise in the validation set.
 
 ## Requirements checked on every run
 
@@ -79,7 +81,7 @@ for requirements of the form $`m \ge \tau_m`$, with the upper quantile used for 
 | counterfactual_flip_rate | ≤ 0.10 |
 | sensitive_attribution_share | ≤ 0.20 |
 
-All thresholds live in the configuration files. An absolute accuracy threshold was used in the first version and replaced, because its meaning depends on the base rate of each dataset; the lift criterion is
+All thresholds live in the configuration files. Accuracy is assessed relative to the base rate of each dataset, through its lift over always predicting the majority outcome:
 
 ```math
 \text{acc} - \max\left(\bar{y},\, 1-\bar{y}\right) \ge 0.02
