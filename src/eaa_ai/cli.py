@@ -8,7 +8,7 @@ import yaml
 from .acs import load_public_coverage
 from .data import frame_to_dataset, load_table, split_and_standardise, synthetic_public_benefit
 from .ledger import AuditLedger, digest_array
-from .report import write_report
+from .report import annotate_report, review_status, write_report
 from .trainer import train_with_accountability
 
 
@@ -129,8 +129,39 @@ def command_approve(arguments):
         },
     )
     ledger.save(arguments.ledger)
-    print(json.dumps({"recorded": record["hash"], "decision": arguments.decision}))
-    return 0
+    verified, _ = AuditLedger.load(arguments.ledger).verify()
+    report = Path(arguments.ledger).with_name("eaa_ai_audit_report.xlsx")
+    if report.exists():
+        annotate_report(report, ledger, verified)
+    if arguments.summary:
+        write_review_summary(arguments.summary, ledger, record, decision, verified)
+    print(json.dumps({"recorded": record["hash"], "decision": arguments.decision, "ledger_verified": verified, "report_updated": report.exists()}))
+    return 0 if verified else 1
+
+
+def write_review_summary(path, ledger, record, decision, verified):
+    note = " ".join((record["payload"]["note"] or "None given").split()).replace("|", "\\|")
+    lines = [
+        "## EAA-AI human review",
+        "",
+        f"**Status:** {review_status(ledger)}",
+        "",
+        "| Item | Value |",
+        "|---|---|",
+        f"| Decision | {record['payload']['decision']} |",
+        f"| Accountable role | {record['actor']['role']} |",
+        f"| Reviewer | {record['actor']['unit']} |",
+        f"| Justification | {note} |",
+        f"| Recorded at | {record['timestamp'][:19].replace('T', ' ')} UTC |",
+        f"| Model reviewed (parameters hash) | `{decision['payload']['parameters_hash'][:16]}` |",
+        f"| Deployment decision reviewed | `{decision['hash'][:16]}` |",
+        f"| Automated gate at review time | {'Deployable' if decision['payload']['deployable'] else 'Blocked'} |",
+        f"| Ledger records | {len(ledger.records)} |",
+        f"| Ledger integrity | {'Verified' if verified else 'BROKEN'} |",
+        f"| Ledger head | `{ledger.head[:16]}` |",
+    ]
+    with Path(path).open("a", encoding="utf-8") as handle:
+        handle.write("\n".join(lines) + "\n\n")
 
 
 def build_parser():
@@ -151,6 +182,7 @@ def build_parser():
     approve.add_argument("--reviewer-unit", default="oversight")
     approve.add_argument("--decision", choices=["approve", "reject"], required=True)
     approve.add_argument("--note", default="")
+    approve.add_argument("--summary", default=None)
     approve.set_defaults(handler=command_approve)
     return parser
 

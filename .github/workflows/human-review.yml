@@ -30,13 +30,13 @@ jobs:
   review:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
           cache: pip
       - run: pip install -e .
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v7
         with:
           name: eaa-ai-audit
           path: outputs/
@@ -52,8 +52,9 @@ jobs:
           --reviewer-unit "${{ github.actor }}"
           --decision "${{ inputs.decision }}"
           --note "$NOTE"
+          --summary "$GITHUB_STEP_SUMMARY"
       - run: eaa-ai verify --ledger outputs/governed/audit_ledger.jsonl
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v6
         with:
           name: eaa-ai-reviewed-${{ inputs.audit_run_id }}
           path: outputs/governed/

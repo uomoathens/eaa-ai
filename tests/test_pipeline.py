@@ -40,11 +40,57 @@ def test_baseline_without_fairness_fails_strict_gate(tmp_path, capsys):
 
 def test_human_review_extends_a_valid_chain(tmp_path, capsys):
     main(["run", "--config", str(ROOT / "configs" / "default.yaml"), "--output", str(tmp_path)])
-    ledger_path = tmp_path / "audit_ledger.jsonl"
-    code = main(["approve", "--ledger", str(ledger_path), "--reviewer-role", "deployer", "--decision", "approve"])
     capsys.readouterr()
+    ledger_path = tmp_path / "audit_ledger.jsonl"
+    summary_path = tmp_path / "summary.md"
+    code = main(
+        [
+            "approve",
+            "--ledger",
+            str(ledger_path),
+            "--reviewer-role",
+            "deployer",
+            "--reviewer-unit",
+            "reviewer-account",
+            "--decision",
+            "approve",
+            "--note",
+            "Checked | thresholds\nand intervals",
+            "--summary",
+            str(summary_path),
+        ]
+    )
+    output = json.loads(capsys.readouterr().out)
     ledger = AuditLedger.load(ledger_path)
     assert code == 0
+    assert output["report_updated"] is True
     assert ledger.records[-1]["event"] == "human_review"
     assert ledger.verify() == (True, None)
     assert main(["verify", "--ledger", str(ledger_path)]) == 0
+    workbook = load_workbook(tmp_path / "eaa_ai_audit_report.xlsx")
+    assert workbook.sheetnames[1] == "Human review"
+    review = workbook["Human review"]
+    assert review.max_row == 2
+    assert review.cell(row=2, column=2).value == "approve"
+    assert workbook["Audit ledger"].max_row == len(ledger.records) + 1
+    summary = {row[0].value: row[1].value for row in workbook["Summary"].iter_rows(min_row=2)}
+    assert summary["Human approval"].startswith("Approved by deployer (reviewer-account)")
+    assert summary["Ledger records"] == len(ledger.records)
+    assert summary["Ledger head hash"] == ledger.head
+    text = summary_path.read_text(encoding="utf-8")
+    assert "Approved by deployer" in text
+    assert "Checked \\| thresholds and intervals" in text
+
+
+def test_review_is_refused_on_a_tampered_ledger(tmp_path, capsys):
+    main(["run", "--config", str(ROOT / "configs" / "default.yaml"), "--output", str(tmp_path)])
+    ledger_path = tmp_path / "audit_ledger.jsonl"
+    lines = ledger_path.read_text(encoding="utf-8").splitlines()
+    record = json.loads(lines[3])
+    record["payload"]["flagged"] = not record["payload"]["flagged"]
+    lines[3] = json.dumps(record, sort_keys=True)
+    ledger_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    code = main(["approve", "--ledger", str(ledger_path), "--reviewer-role", "deployer", "--decision", "approve"])
+    capsys.readouterr()
+    assert code == 1
+    assert AuditLedger.load(ledger_path).records[-1]["event"] != "human_review"

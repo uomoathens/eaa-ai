@@ -1,6 +1,7 @@
 from pathlib import Path
 
 import pandas as pd
+from openpyxl import load_workbook
 from openpyxl.styles import Alignment, Font, PatternFill
 from openpyxl.utils import get_column_letter
 
@@ -83,26 +84,25 @@ def _history_frame(result):
     return frame.drop(columns=["margins"])
 
 
+def _ledger_row(record):
+    payload = record["payload"]
+    return {
+        "index": record["index"],
+        "timestamp": record["timestamp"],
+        "event": record["event"],
+        "role": record["actor"].get("role"),
+        "unit": record["actor"].get("unit"),
+        "fairness_weight": payload.get("fairness_weight", payload.get("selected_fairness_weight")),
+        "iteration": payload.get("iteration", payload.get("selected_iteration")),
+        "flagged": payload.get("flagged"),
+        "parameters_hash": payload.get("parameters_hash", payload.get("reviewed_parameters_hash")),
+        "previous_hash": record["previous_hash"],
+        "hash": record["hash"],
+    }
+
+
 def _ledger_frame(result):
-    rows = []
-    for record in result.ledger.records:
-        payload = record["payload"]
-        rows.append(
-            {
-                "index": record["index"],
-                "timestamp": record["timestamp"],
-                "event": record["event"],
-                "role": record["actor"].get("role"),
-                "unit": record["actor"].get("unit"),
-                "fairness_weight": payload.get("fairness_weight", payload.get("selected_fairness_weight")),
-                "iteration": payload.get("iteration", payload.get("selected_iteration")),
-                "flagged": payload.get("flagged"),
-                "parameters_hash": payload.get("parameters_hash"),
-                "previous_hash": record["previous_hash"],
-                "hash": record["hash"],
-            }
-        )
-    return pd.DataFrame(rows)
+    return pd.DataFrame([_ledger_row(record) for record in result.ledger.records])
 
 
 def _importance_frame(result):
@@ -162,3 +162,62 @@ def write_report(result, test, path, verified, case_limit=200):
             for column in range(1, 8):
                 requirements.cell(row=row, column=column).fill = fill
     return target
+
+
+def _review_rows(ledger):
+    return [
+        {
+            "timestamp": record["timestamp"],
+            "decision": record["payload"]["decision"],
+            "role": record["actor"].get("role"),
+            "reviewer": record["actor"].get("unit"),
+            "note": record["payload"].get("note", ""),
+            "reviewed_parameters_hash": record["payload"]["reviewed_parameters_hash"],
+            "reviewed_record_hash": record["payload"]["reviewed_record_hash"],
+            "review_record_hash": record["hash"],
+        }
+        for record in ledger.records
+        if record["event"] == "human_review"
+    ]
+
+
+def review_status(ledger):
+    reviews = _review_rows(ledger)
+    if not reviews:
+        return "Required before deployment"
+    last = reviews[-1]
+    verb = "Approved" if last["decision"] == "approve" else "Rejected"
+    return f"{verb} by {last['role']} ({last['reviewer']}) on {last['timestamp'][:19].replace('T', ' ')} UTC"
+
+
+def annotate_report(path, ledger, verified):
+    workbook = load_workbook(path)
+    ledger_sheet = workbook["Audit ledger"]
+    headers = [cell.value for cell in ledger_sheet[1]]
+    existing = {ledger_sheet.cell(row=row, column=1).value for row in range(2, ledger_sheet.max_row + 1)}
+    for record in ledger.records:
+        if record["index"] not in existing:
+            row = _ledger_row(record)
+            ledger_sheet.append([row.get(header) for header in headers])
+    summary = workbook["Summary"]
+    updates = {
+        "Ledger records": len(ledger.records),
+        "Ledger integrity": "Verified" if verified else "BROKEN",
+        "Ledger head hash": ledger.head,
+        "Human approval": review_status(ledger),
+    }
+    for row in range(2, summary.max_row + 1):
+        label = summary.cell(row=row, column=1).value
+        if label in updates:
+            summary.cell(row=row, column=2).value = updates[label]
+    if "Human review" in workbook.sheetnames:
+        del workbook["Human review"]
+    review_sheet = workbook.create_sheet("Human review", 1)
+    rows = _review_rows(ledger)
+    columns = list(rows[0]) if rows else ["timestamp", "decision", "role", "reviewer", "note"]
+    review_sheet.append(columns)
+    for entry in rows:
+        review_sheet.append([entry[column] for column in columns])
+    _format(review_sheet)
+    workbook.save(path)
+    return path
