@@ -1,0 +1,55 @@
+actor:
+  role: provider
+  unit: ml-engineering
+
+data:
+  source: acs_public_coverage
+  target: public_coverage
+  sensitive: protected_group
+  split_seed: 7
+  acs:
+    states:
+      - CA
+    year: 2018
+    horizon: 1-Year
+    root: .cache/acs
+    max_rows: 150000
+    seed: 7
+
+proxy_features:
+  - ANC
+  - CIT
+  - native_born
+
+model:
+  iterations: 800
+  learning_rate: 0.3
+  fairness_weight: 30.0
+  explain_weight: 0.0005
+  threshold: 0.5
+  blind_features:
+    - protected_group
+
+reward:
+  gamma_bias: 1.0
+  gamma_ethics: 0.5
+
+policy:
+  accuracy:
+    threshold: 0.70
+    direction: min
+  abs_statistical_parity_difference:
+    threshold: 0.10
+    direction: max
+  disparate_impact_ratio:
+    threshold: 0.80
+    direction: min
+  equalized_odds_difference:
+    threshold: 0.15
+    direction: max
+  counterfactual_flip_rate:
+    threshold: 0.10
+    direction: max
+  sensitive_attribution_share:
+    threshold: 0.20
+    direction: max

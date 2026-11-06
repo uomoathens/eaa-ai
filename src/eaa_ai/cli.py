@@ -5,6 +5,7 @@ from pathlib import Path
 
 import yaml
 
+from .acs import load_public_coverage
 from .data import frame_to_dataset, load_table, split_and_standardise, synthetic_public_benefit
 from .ledger import AuditLedger, digest_array
 from .report import write_report
@@ -18,8 +19,11 @@ def load_config(path):
 
 def build_dataset(config):
     data_cfg = config["data"]
-    if data_cfg.get("source", "synthetic") == "synthetic":
+    source = data_cfg.get("source", "synthetic")
+    if source == "synthetic":
         frame = synthetic_public_benefit(**data_cfg.get("synthetic", {}))
+    elif source == "acs_public_coverage":
+        frame = load_public_coverage(**data_cfg.get("acs", {}))
     else:
         frame = load_table(data_cfg["path"])
     dataset = frame_to_dataset(frame, data_cfg["target"], data_cfg["sensitive"], data_cfg.get("features"))

@@ -24,7 +24,11 @@ jobs:
         with:
           python-version: "3.12"
           cache: pip
-      - run: pip install -e .
+      - run: pip install -e ".[acs]"
+      - uses: actions/cache@v4
+        with:
+          path: .cache/acs
+          key: acs-pums-2018-1-Year-CA
       - name: Run governed training
         env:
           CONFIG: ${{ inputs.config || 'configs/default.yaml' }}
@@ -32,9 +36,17 @@ jobs:
       - name: Run unconstrained baseline for comparison
         if: always()
         run: eaa-ai run --config configs/baseline.yaml --output outputs/baseline --summary "$GITHUB_STEP_SUMMARY"
+      - name: Run governed training on real ACS public coverage data
+        if: always()
+        run: eaa-ai run --config configs/acs_public_coverage.yaml --output outputs/acs_public_coverage --summary "$GITHUB_STEP_SUMMARY"
+      - name: Run unconstrained baseline on real ACS public coverage data
+        if: always()
+        run: eaa-ai run --config configs/acs_baseline.yaml --output outputs/acs_baseline --summary "$GITHUB_STEP_SUMMARY"
       - name: Verify ledger integrity
         if: always()
-        run: eaa-ai verify --ledger outputs/governed/audit_ledger.jsonl
+        run: |
+          eaa-ai verify --ledger outputs/governed/audit_ledger.jsonl
+          eaa-ai verify --ledger outputs/acs_public_coverage/audit_ledger.jsonl
       - uses: actions/upload-artifact@v4
         if: always()
         with:

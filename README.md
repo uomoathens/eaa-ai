@@ -76,10 +76,32 @@ All thresholds live in `configs/default.yaml`.
 Nothing needs to be run locally.
 
 - **CI** runs the test suite on Python 3.10 to 3.13 on every push and pull request.
-- **Accountability audit** runs on every push to `main`, every Monday at 05:17 UTC and on demand (Actions → Accountability audit → Run workflow). It trains the governed model with `--strict`, trains an unconstrained baseline for comparison, verifies the ledger, writes the results table to the run summary and uploads all outputs as the `eaa-ai-audit` artifact.
+- **Accountability audit** runs on every push to `main`, every Monday at 05:17 UTC and on demand (Actions → Accountability audit → Run workflow). It trains the governed model with `--strict`, trains an unconstrained baseline for comparison, repeats both on real ACS data, verifies the ledgers, writes the results table to the run summary and uploads all outputs as the `eaa-ai-audit` artifact.
 - **Human review** (Actions → Human review → Run workflow) takes the run ID of an audit, a decision and a justification, appends a `human_review` record to that run's ledger, re-verifies the chain and stores the reviewed ledger for 365 days.
 
 With the bundled configuration the governed model passes every requirement while the unconstrained baseline is blocked on the disparate impact ratio, which shows the gate doing its job.
+
+Each audit run produces four results, all written to the run summary and the artifact:
+
+| Output folder | Data | Fairness constraint | Gates the workflow |
+|---|---|---|---|
+| `governed` | Synthetic public benefit | Yes | Yes (`--strict`) |
+| `baseline` | Synthetic public benefit | No | No |
+| `acs_public_coverage` | Real ACS public coverage | Yes | No |
+| `acs_baseline` | Real ACS public coverage | No | No |
+
+The real-data runs are reported, not enforced: whether a model trained on real data clears every requirement is a finding to be read, not a build condition.
+
+## Real data: ACS public health coverage
+
+`configs/acs_public_coverage.yaml` applies the architecture to the ACSPublicCoverage task of Folktables: predicting whether a low-income individual under 65 (personal income up to USD 30,000) is covered by public health insurance. The data are the 2018 one-year American Community Survey Public Use Microdata Sample for California, downloaded from the US Census Bureau on the first run and cached between runs.
+
+- **Sensitive attribute:** race (`RAC1P`), binarised as White versus all other groups. It is used only to measure bias and is blind to the model (`blind_features`), in the spirit of Article 10(5) of the AI Act.
+- **Declared proxies:** ancestry (`ANC`), citizenship (`CIT`) and nativity (`native_born`), whose share of the SHAP mass is monitored.
+- **Population filter and target** follow the published Folktables task definition; categorical variables are one-hot encoded and the state indicator is dropped for single-state runs.
+- **Size:** up to 150,000 sampled individuals (`max_rows`), split 60/20/20.
+
+Please cite the task as: Ding, F., Hardt, M., Miller, J. and Schmidt, L. (2021). Retiring Adult: New Datasets for Fair Machine Learning. *Advances in Neural Information Processing Systems 34*. The data contain information about real people; no attempt may be made to re-identify individuals.
 
 ## Using your own data
 
@@ -87,7 +109,7 @@ Set `data.source` to `file`, point `data.path` to an `.xlsx` or `.csv` table, an
 
 ## Limitations
 
-The bundled data are synthetic. The exact SHAP explainer applies to the linear model; non-linear or generative models need a model-agnostic explainer or the counterfactual regulariser of CER-GAI (§8.4). When historical labels are themselves biased, demographic parity and equalized odds pull in opposite directions; raising `historical_bias` in the configuration makes this trade-off visible, and the gate will then block deployment rather than hide it. Passing the gate supports, but does not by itself constitute, a conformity assessment under the AI Act.
+The default configuration uses synthetic data; the ACS configuration uses real survey microdata from one US state and year, so its results describe that population and should not be generalised to European public services without validation on European data. The exact SHAP explainer applies to the linear model; non-linear or generative models need a model-agnostic explainer or the counterfactual regulariser of CER-GAI (§8.4). When historical labels are themselves biased, demographic parity and equalized odds pull in opposite directions; raising `historical_bias` in the configuration makes this trade-off visible, and the gate will then block deployment rather than hide it. Passing the gate supports, but does not by itself constitute, a conformity assessment under the AI Act.
 
 ## Licence
 

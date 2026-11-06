@@ -17,6 +17,16 @@ from .model import FairLogisticRegression
 from .reward import responsible_reward_original, responsible_reward_refined
 
 
+def resolve_features(feature_names, patterns):
+    indices = []
+    for pattern in patterns:
+        matches = [i for i, name in enumerate(feature_names) if name == pattern or name.startswith(f"{pattern}_")]
+        if not matches:
+            raise KeyError(f"no feature matches {pattern}")
+        indices.extend(matches)
+    return sorted(set(indices))
+
+
 @dataclass
 class RunResult:
     model: FairLogisticRegression
@@ -52,7 +62,7 @@ def train_with_accountability(train, validation, test, config):
     reward_cfg = config["reward"]
     actor = config["actor"]
     policy = CompliancePolicy.from_mapping(config["policy"])
-    proxy_indices = [train.feature_names.index(name) for name in config.get("proxy_features", [])]
+    proxy_indices = resolve_features(train.feature_names, config.get("proxy_features", []))
     explainer = LinearShapExplainer(train.features)
     model = FairLogisticRegression(
         n_features=train.features.shape[1],
@@ -60,7 +70,7 @@ def train_with_accountability(train, validation, test, config):
         explain_weight=model_cfg["explain_weight"],
         learning_rate=model_cfg["learning_rate"],
         threshold=model_cfg.get("threshold", 0.5),
-        blind_indices=[train.feature_names.index(name) for name in model_cfg.get("blind_features", [])],
+        blind_indices=resolve_features(train.feature_names, model_cfg.get("blind_features", [])),
     )
     ledger = AuditLedger()
     ledger.append(

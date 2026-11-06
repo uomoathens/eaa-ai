@@ -19,6 +19,7 @@ dependencies = [
 
 [project.optional-dependencies]
 dev = ["pytest>=7.4"]
+acs = ["folktables>=0.0.12"]
 
 [project.scripts]
 eaa-ai = "eaa_ai.cli:main"
