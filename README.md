@@ -7,7 +7,7 @@ Reference implementation of the Explainable Accountability-Aware AI Architecture
 
 > Sargiotis, D. (2026). *Empathy in Algorithms: Shaping Ethical AI for a Just and Inclusive Society*. Springer Nature. §8.4 (EAA-AI) and §9.4 (XAI-AAI). https://doi.org/10.1007/978-3-032-32128-2
 
-The repository turns the architecture into runnable, testable software and extends it with four refinements aimed at the high-risk obligations of the EU AI Act (Regulation (EU) 2024/1689), which apply to stand-alone Annex III systems from 2 December 2027 following the Digital Omnibus on AI.
+The repository turns the architecture into runnable, testable software and extends it with five refinements aimed at the high-risk obligations of the EU AI Act (Regulation (EU) 2024/1689), which apply to stand-alone Annex III systems from 2 December 2027 following the Digital Omnibus on AI.
 
 ## What it does
 
@@ -16,7 +16,7 @@ Every training run of a public-service decision model (the bundled example is el
 | Output | Content |
 |---|---|
 | `audit_ledger.jsonl` | Tamper-evident, hash-chained record of every parameter update, compliance evaluation, rollback, deployment decision and human review |
-| `eaa_ai_audit_report.xlsx` | Summary, requirement-by-requirement pass/fail, full training history, ledger, global SHAP importance and the top three reasons behind each individual decision |
+| `eaa_ai_audit_report.xlsx` | Summary, requirement-by-requirement pass/fail with 95% bootstrap confidence intervals, model selection across fairness weights, diagnostics against a reference model, full training history, ledger, global SHAP importance and the top three reasons behind each individual decision |
 | `model.json` | Selected parameters, their hash and the ledger head they are bound to |
 
 ## Architecture
@@ -58,18 +58,32 @@ and deployment requires $`\min_m (m(\theta_t) - \tau_m) \ge 0`$ on held-out data
 
 **4. Role-based accountability.** Records are attributed to AI Act roles (`provider`, `deployer`, `oversight-board`) and organisational units rather than to individual engineers. Human oversight (Article 14) is a separate, signed ledger event.
 
+**5. Fairness only as strong as needed, chosen with statistical confidence.** The book fixes the fairness weight $`\lambda`$. Here a grid of weights is trained and the **smallest** $`\lambda`$ is selected whose validation metrics clear every requirement at the 95% one-sided bootstrap confidence level:
+
+```math
+\lambda^{*} = \min \left\{ \lambda \in \Lambda \ :\ \min_{m} \left( Q_{0.05}\big(m_{\lambda}\big) - \tau_m \right) \ge 0 \right\}
+```
+
+for requirements of the form $`m \ge \tau_m`$, with the upper quantile used for requirements of the form $`m \le \tau_m`$. If no weight qualifies, the candidate closest to qualifying is selected and the shortfall is recorded. Every candidate, its confidence margins and the reason for the choice are written to the ledger. This guards against two failure modes observed while building the repository: applying a strong constraint where no bias exists, which can move decisions the wrong way, and selecting a weight on the strength of validation noise.
+
 ## Requirements checked on every run
 
 | Metric | Default rule |
 |---|---|
-| accuracy | ≥ 0.75 |
+| accuracy_lift (accuracy minus that of always predicting the majority outcome) | ≥ 0.02 |
 | abs_statistical_parity_difference | ≤ 0.10 |
 | disparate_impact_ratio | ≥ 0.80 (four-fifths rule) |
 | equalized_odds_difference | ≤ 0.15 |
 | counterfactual_flip_rate | ≤ 0.10 |
 | sensitive_attribution_share | ≤ 0.20 |
 
-All thresholds live in `configs/default.yaml`.
+All thresholds live in the configuration files. An absolute accuracy threshold was used in the first version and replaced, because its meaning depends on the base rate of each dataset; the lift criterion is
+
+```math
+\text{acc} - \max\left(\bar{y},\, 1-\bar{y}\right) \ge 0.02
+```
+
+Each report also carries a **Diagnostics** sheet: observed and predicted positive rates for each group, the accuracy of the constant predictor, and an unconstrained scikit-learn logistic regression trained on the same inputs, so that under-training can be told apart from a genuine limit of the data.
 
 ## Running it on GitHub
 
@@ -79,7 +93,7 @@ Nothing needs to be run locally.
 - **Accountability audit** runs on every push to `main`, every Monday at 05:17 UTC and on demand (Actions → Accountability audit → Run workflow). It trains the governed model with `--strict`, trains an unconstrained baseline for comparison, repeats both on real ACS data, verifies the ledgers, writes the results table to the run summary and uploads all outputs as the `eaa-ai-audit` artifact.
 - **Human review** (Actions → Human review → Run workflow) takes the run ID of an audit, a decision and a justification, appends a `human_review` record to that run's ledger, re-verifies the chain and stores the reviewed ledger for 365 days.
 
-With the bundled configuration the governed model passes every requirement while the unconstrained baseline is blocked on the disparate impact ratio, which shows the gate doing its job.
+On the synthetic data (60,000 records with a deliberately strong historical bias) the governed model selects $`\lambda = 1`$ and passes every requirement, while the unconstrained baseline is blocked with a disparate impact ratio of 0.766 (95% CI 0.730 to 0.806). The governed model passes on point estimates but with thin margins (disparate impact ratio 0.808, 95% CI 0.767 to 0.851; equalized odds difference 0.1496 against a limit of 0.15), which the confidence intervals make explicit rather than hide. An earlier version with 6,000 records appeared to separate the two models more sharply; at that sample size the difference was within sampling noise.
 
 Each audit run produces four results, all written to the run summary and the artifact:
 
@@ -100,6 +114,7 @@ The real-data runs are reported, not enforced: whether a model trained on real d
 - **Declared proxies:** ancestry (`ANC`), citizenship (`CIT`) and nativity (`native_born`), whose share of the SHAP mass is monitored.
 - **Population filter and target** follow the published Folktables task definition; categorical variables are one-hot encoded and the state indicator is dropped for single-state runs.
 - **Size:** up to 150,000 sampled individuals (`max_rows`), split 60/20/20.
+- **Training:** all inputs except the sensitive attribute are standardised, 1,500 full-batch iterations per candidate, fairness weight selected from the grid with 95% confidence as described above; `acs_baseline.yaml` is the same model with $`\lambda = 0`$.
 
 Please cite the task as: Ding, F., Hardt, M., Miller, J. and Schmidt, L. (2021). Retiring Adult: New Datasets for Fair Machine Learning. *Advances in Neural Information Processing Systems 34*. The data contain information about real people; no attempt may be made to re-identify individuals.
 

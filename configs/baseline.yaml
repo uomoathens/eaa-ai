@@ -8,8 +8,8 @@ data:
   sensitive: protected_group
   split_seed: 7
   synthetic:
-    n_samples: 6000
-    historical_bias: 0.4
+    n_samples: 60000
+    historical_bias: 0.8
     proxy_strength: 0.7
     seed: 7
 
@@ -30,8 +30,8 @@ reward:
   gamma_ethics: 0.5
 
 policy:
-  accuracy:
-    threshold: 0.75
+  accuracy_lift:
+    threshold: 0.02
     direction: min
   abs_statistical_parity_difference:
     threshold: 0.10

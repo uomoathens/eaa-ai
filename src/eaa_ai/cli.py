@@ -27,7 +27,9 @@ def build_dataset(config):
     else:
         frame = load_table(data_cfg["path"])
     dataset = frame_to_dataset(frame, data_cfg["target"], data_cfg["sensitive"], data_cfg.get("features"))
-    return split_and_standardise(dataset, seed=data_cfg.get("split_seed", 7))
+    return split_and_standardise(
+        dataset, seed=data_cfg.get("split_seed", 7), standardise_binary=data_cfg.get("standardise_binary", False)
+    )
 
 
 def write_markdown_summary(path, config_path, result, verified):
@@ -37,15 +39,20 @@ def write_markdown_summary(path, config_path, result, verified):
         "",
         f"**Status:** {status}",
         "",
+        f"Selected fairness weight λ: {result.selected_fairness_weight} (tried {', '.join(str(c['fairness_weight']) for c in result.candidates)})",
+        "",
+        f"Base rate: {result.diagnostics['base_rate']:.4f} | Constant predictor accuracy: {result.diagnostics['constant_predictor_accuracy']:.4f} | Reference model accuracy: {result.diagnostics['reference_model']['accuracy']:.4f} | Selected model accuracy: {result.diagnostics['selected_model']['accuracy']:.4f}",
+        "",
         f"Selected iteration: {result.selected_iteration} | Rolled back: {'yes' if result.rolled_back else 'no'} | Ledger: {'verified' if verified else 'BROKEN'} | Head: `{result.ledger.head[:16]}`",
         "",
-        "| Metric | Rule | Test value | Status |",
-        "|---|---|---|---|",
+        "| Metric | Rule | Test value | 95% CI | Status |",
+        "|---|---|---|---|---|",
     ]
     for name, spec in result.config["policy"].items():
         rule = f"{'≤' if spec['direction'] == 'max' else '≥'} {spec['threshold']}"
         passed = result.test_compliance["margins"][name] >= 0
-        lines.append(f"| {name} | {rule} | {result.test_metrics[name]:.4f} | {'PASS' if passed else 'FAIL'} |")
+        low, high = result.test_intervals[name]
+        lines.append(f"| {name} | {rule} | {result.test_metrics[name]:.4f} | {low:.4f} to {high:.4f} | {'PASS' if passed else 'FAIL'} |")
     with Path(path).open("a", encoding="utf-8") as handle:
         handle.write("\n".join(lines) + "\n\n")
 
@@ -69,6 +76,7 @@ def command_run(arguments):
                 "threshold": result.model.threshold,
                 "parameters_hash": digest_array(result.model.parameters),
                 "selected_iteration": result.selected_iteration,
+                "selected_fairness_weight": result.selected_fairness_weight,
                 "deployable": result.deployable,
                 "ledger_head": result.ledger.head,
             },
@@ -80,6 +88,7 @@ def command_run(arguments):
         "deployable": result.deployable,
         "rolled_back": result.rolled_back,
         "selected_iteration": result.selected_iteration,
+        "selected_fairness_weight": result.selected_fairness_weight,
         "violations": result.test_compliance["violations"],
         "ledger_verified": verified,
         "report": str(report_path),

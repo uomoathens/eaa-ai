@@ -75,7 +75,7 @@ def frame_to_dataset(frame, target, sensitive, features=None):
     )
 
 
-def split_and_standardise(dataset, fractions=(0.6, 0.2, 0.2), seed=7):
+def split_and_standardise(dataset, fractions=(0.6, 0.2, 0.2), seed=7, standardise_binary=False):
     rng = np.random.default_rng(seed)
     order = rng.permutation(len(dataset.labels))
     first = int(fractions[0] * len(order))
@@ -86,10 +86,11 @@ def split_and_standardise(dataset, fractions=(0.6, 0.2, 0.2), seed=7):
         for index in range(train.features.shape[1])
         if set(np.unique(train.features[:, index])).issubset({0.0, 1.0})
     ]
+    unscaled = sorted({dataset.sensitive_index} | (set() if standardise_binary else set(binary)))
     mean = train.features.mean(axis=0)
     scale = train.features.std(axis=0)
-    mean[binary] = 0.0
-    scale[binary] = 1.0
+    mean[unscaled] = 0.0
+    scale[unscaled] = 1.0
     scale[scale == 0.0] = 1.0
     for part in (train, validation, test):
         part.features = (part.features - mean) / scale

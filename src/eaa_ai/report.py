@@ -12,6 +12,8 @@ FAIL_FILL = PatternFill("solid", fgColor="FCE4D6")
 
 def _summary_frame(result, verified):
     rows = [
+        ("Selected fairness weight (lambda)", result.selected_fairness_weight),
+        ("Fairness weights tried", ", ".join(str(c["fairness_weight"]) for c in result.candidates)),
         ("Selected iteration", result.selected_iteration),
         ("Rolled back to last compliant iteration", "Yes" if result.rolled_back else "No"),
         ("Deployable on test set", "Yes" if result.deployable else "No"),
@@ -37,11 +39,42 @@ def _requirements_frame(result):
                 "Metric": name,
                 "Rule": f"{'<=' if spec['direction'] == 'max' else '>='} {spec['threshold']}",
                 "Test value": round(value, 6),
+                "95% CI low": round(result.test_intervals[name][0], 6),
+                "95% CI high": round(result.test_intervals[name][1], 6),
                 "Margin": round(margin, 6),
                 "Status": "PASS" if margin >= 0 else "FAIL",
             }
         )
     return pd.DataFrame(rows)
+
+
+def _selection_frame(result):
+    return pd.DataFrame(result.candidates)
+
+
+def _diagnostics_frame(result):
+    d = result.diagnostics
+    rows = [
+        ("Test set size", d["test_size"], ""),
+        ("Share in protected group", d["protected_group_share"], ""),
+        ("Observed positive rate (all)", d["base_rate"], ""),
+        ("Observed positive rate (reference group)", d["base_rate_reference_group"], ""),
+        ("Observed positive rate (protected group)", d["base_rate_protected_group"], ""),
+        ("Constant predictor accuracy", d["constant_predictor_accuracy"], "Accuracy of always predicting the majority outcome"),
+    ]
+    for label, key in (("Selected model", "selected_model"), ("Reference model (scikit-learn, unconstrained)", "reference_model")):
+        block = d[key]
+        rows.extend(
+            [
+                (f"{label}: accuracy", block["accuracy"], ""),
+                (f"{label}: accuracy lift over constant predictor", block["accuracy_lift"], ""),
+                (f"{label}: predicted positive rate", block["positive_rate"], ""),
+                (f"{label}: predicted positive rate (reference group)", block["positive_rate_reference_group"], ""),
+                (f"{label}: predicted positive rate (protected group)", block["positive_rate_protected_group"], ""),
+            ]
+        )
+    rows.append(("Accuracy gap to reference model", d["accuracy_gap_to_reference"], "Large positive gap suggests under-training"))
+    return pd.DataFrame(rows, columns=["Diagnostic", "Value", "Note"])
 
 
 def _history_frame(result):
@@ -61,6 +94,7 @@ def _ledger_frame(result):
                 "event": record["event"],
                 "role": record["actor"].get("role"),
                 "unit": record["actor"].get("unit"),
+                "fairness_weight": payload.get("fairness_weight", payload.get("selected_fairness_weight")),
                 "iteration": payload.get("iteration", payload.get("selected_iteration")),
                 "flagged": payload.get("flagged"),
                 "parameters_hash": payload.get("parameters_hash"),
@@ -109,6 +143,8 @@ def write_report(result, test, path, verified, case_limit=200):
     sheets = {
         "Summary": _summary_frame(result, verified),
         "Requirements": _requirements_frame(result),
+        "Model selection": _selection_frame(result),
+        "Diagnostics": _diagnostics_frame(result),
         "Training history": _history_frame(result),
         "Audit ledger": _ledger_frame(result),
         "Global explanation": _importance_frame(result),
@@ -121,8 +157,8 @@ def write_report(result, test, path, verified, case_limit=200):
             _format(writer.sheets[name])
         requirements = writer.sheets["Requirements"]
         for row in range(2, requirements.max_row + 1):
-            status = requirements.cell(row=row, column=5)
+            status = requirements.cell(row=row, column=7)
             fill = PASS_FILL if status.value == "PASS" else FAIL_FILL
-            for column in range(1, 6):
+            for column in range(1, 8):
                 requirements.cell(row=row, column=column).fill = fill
     return target

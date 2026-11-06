@@ -7,6 +7,7 @@ data:
   target: public_coverage
   sensitive: protected_group
   split_seed: 7
+  standardise_binary: true
   acs:
     states:
       - CA
@@ -22,9 +23,12 @@ proxy_features:
   - native_born
 
 model:
-  iterations: 800
-  learning_rate: 0.3
+  iterations: 1500
+  learning_rate: 0.5
   fairness_weight: 30.0
+  fairness_weight_grid: [0.0, 1.0, 3.0, 10.0, 30.0]
+  selection_confidence: 0.95
+  bootstrap_samples: 200
   explain_weight: 0.0005
   threshold: 0.5
   blind_features:
@@ -35,8 +39,8 @@ reward:
   gamma_ethics: 0.5
 
 policy:
-  accuracy:
-    threshold: 0.70
+  accuracy_lift:
+    threshold: 0.02
     direction: min
   abs_statistical_parity_difference:
     threshold: 0.10

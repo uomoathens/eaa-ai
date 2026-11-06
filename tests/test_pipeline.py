@@ -19,6 +19,8 @@ def test_default_run_is_deployable_and_reported(tmp_path, capsys):
     assert workbook.sheetnames == [
         "Summary",
         "Requirements",
+        "Model selection",
+        "Diagnostics",
         "Training history",
         "Audit ledger",
         "Global explanation",
