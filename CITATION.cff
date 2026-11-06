@@ -9,6 +9,7 @@ authors:
     given-names: Dimitrios
     affiliation: "School of Civil Engineering, National Technical University of Athens"
     orcid: "https://orcid.org/0009-0006-3644-4561"
+doi: "10.5281/zenodo.24019871"
 repository-code: "https://github.com/uomoathens/eaa-ai"
 abstract: >-
   Runnable, tested implementation of the Explainable Accountability-Aware AI

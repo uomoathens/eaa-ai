@@ -1,6 +1,6 @@
 # EAA-AI: Explainable Accountability-Aware AI Architecture
 
-[![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.24019871.svg)](https://doi.org/10.5281/zenodo.24019871) [![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 [![Accountability audit](../../actions/workflows/audit.yml/badge.svg)](../../actions/workflows/audit.yml)
 
 **Dimitrios Sargiotis** · School of Civil Engineering, National Technical University of Athens · [ORCID 0009-0006-3644-4561](https://orcid.org/0009-0006-3644-4561) · [users.ntua.gr/dims](https://users.ntua.gr/dims/)
@@ -132,7 +132,7 @@ The default configuration uses synthetic data; the ACS configuration uses real s
 
 Please cite both the software and the book. Each GitHub release of this repository is archived on Zenodo with its own DOI, linked to the book as a supplement; GitHub's **Cite this repository** button reads `CITATION.cff`.
 
-> Sargiotis, D. (2026). *EAA-AI: reference implementation of the Explainable Accountability-Aware AI Architecture from Empathy in Algorithms* (Version 1.0.0) [Computer software]. https://github.com/uomoathens/eaa-ai
+> Sargiotis, D. (2026). *EAA-AI: reference implementation of the Explainable Accountability-Aware AI Architecture from Empathy in Algorithms* (Version 1.0.0) [Computer software]. Zenodo. https://doi.org/10.5281/zenodo.24019871
 
 > Sargiotis, D. (2026). *Empathy in Algorithms: Shaping Ethical AI for a Just and Inclusive Society*. Springer Nature Switzerland. https://doi.org/10.1007/978-3-032-32128-2
 
