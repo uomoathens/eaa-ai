@@ -1,0 +1,35 @@
+{
+  "upload_type": "software",
+  "title": "EAA-AI: reference implementation of the Explainable Accountability-Aware AI Architecture from Empathy in Algorithms",
+  "version": "1.0.0",
+  "language": "eng",
+  "license": "MIT",
+  "description": "<p>Runnable, tested implementation of the Explainable Accountability-Aware AI Architecture (EAA-AI) introduced in <em>Empathy in Algorithms: Shaping Ethical AI for a Just and Inclusive Society</em> (Springer Nature, 2026), sections 8.4 and 9.4.</p><p>It combines fairness-constrained learning, exact SHAP explanations, a hash-chained audit ledger with role-based accountability, a deployment gate oriented to the high-risk obligations of the EU AI Act, confidence-aware selection of the fairness weight with bootstrap intervals, and recorded human review. It is evaluated on synthetic public-benefit data and on the ACSPublicCoverage task built from US Census microdata.</p>",
+  "creators": [
+    {
+      "name": "Sargiotis, Dimitrios",
+      "affiliation": "School of Civil Engineering, National Technical University of Athens",
+      "orcid": "0009-0006-3644-4561"
+    }
+  ],
+  "keywords": [
+    "responsible AI",
+    "algorithmic fairness",
+    "explainable AI",
+    "SHAP",
+    "accountability",
+    "audit trail",
+    "EU AI Act",
+    "public policy",
+    "human oversight",
+    "folktables"
+  ],
+  "related_identifiers": [
+    {
+      "identifier": "10.1007/978-3-032-32128-2",
+      "relation": "isSupplementTo",
+      "resource_type": "publication-book",
+      "scheme": "doi"
+    }
+  ]
+}

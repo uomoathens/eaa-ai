@@ -18,9 +18,8 @@ on:
         default: deployer
         required: true
       note:
-        description: Justification recorded in the ledger
-        required: false
-        default: ""
+        description: Justification recorded in the ledger (required)
+        required: true
 
 permissions:
   contents: read
@@ -29,6 +28,9 @@ permissions:
 jobs:
   review:
     runs-on: ubuntu-latest
+    env:
+      AUDIT_RUN_ID: ${{ inputs.audit_run_id }}
+      GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
       - uses: actions/checkout@v6
       - uses: actions/setup-python@v6
@@ -42,18 +44,37 @@ jobs:
           path: outputs/
           run-id: ${{ inputs.audit_run_id }}
           github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Keep the original audit ledger as the base
+        run: cp outputs/governed/audit_ledger.jsonl outputs/audit_base_ledger.jsonl
+      - name: Continue from the most recent review of this audit, if any
+        run: |
+          previous=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=eaa-ai-reviewed-$AUDIT_RUN_ID&per_page=100" \
+            --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | last | .workflow_run.id // empty')
+          if [ -n "$previous" ]; then
+            echo "Continuing from review run $previous"
+            gh run download "$previous" -n "eaa-ai-reviewed-$AUDIT_RUN_ID" -D outputs/previous_review
+            cp -f outputs/previous_review/* outputs/governed/
+          else
+            echo "First review of audit run $AUDIT_RUN_ID"
+          fi
+      - name: Check the ledger still extends the original audit
+        run: eaa-ai verify --ledger outputs/governed/audit_ledger.jsonl --extends outputs/audit_base_ledger.jsonl
       - name: Record human review in the ledger
         env:
           NOTE: ${{ inputs.note }}
+          DECISION: ${{ inputs.decision }}
+          ROLE: ${{ inputs.reviewer_role }}
+          REVIEWER: ${{ github.actor }}
         run: >
           eaa-ai approve
           --ledger outputs/governed/audit_ledger.jsonl
-          --reviewer-role "${{ inputs.reviewer_role }}"
-          --reviewer-unit "${{ github.actor }}"
-          --decision "${{ inputs.decision }}"
+          --reviewer-role "$ROLE"
+          --reviewer-unit "$REVIEWER"
+          --decision "$DECISION"
           --note "$NOTE"
           --summary "$GITHUB_STEP_SUMMARY"
-      - run: eaa-ai verify --ledger outputs/governed/audit_ledger.jsonl
+      - name: Verify the reviewed ledger
+        run: eaa-ai verify --ledger outputs/governed/audit_ledger.jsonl --extends outputs/audit_base_ledger.jsonl
       - uses: actions/upload-artifact@v6
         with:
           name: eaa-ai-reviewed-${{ inputs.audit_run_id }}

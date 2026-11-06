@@ -4,7 +4,7 @@ from .ledger import AuditLedger
 from .model import FairLogisticRegression
 from .trainer import RunResult, train_with_accountability
 
-__version__ = "0.1.0"
+__version__ = "1.0.0"
 
 __all__ = [
     "AuditLedger",

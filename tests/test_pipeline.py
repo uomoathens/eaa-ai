@@ -90,7 +90,45 @@ def test_review_is_refused_on_a_tampered_ledger(tmp_path, capsys):
     record["payload"]["flagged"] = not record["payload"]["flagged"]
     lines[3] = json.dumps(record, sort_keys=True)
     ledger_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
-    code = main(["approve", "--ledger", str(ledger_path), "--reviewer-role", "deployer", "--decision", "approve"])
+    code = main(
+        ["approve", "--ledger", str(ledger_path), "--reviewer-role", "deployer", "--decision", "approve", "--note", "Checked"]
+    )
     capsys.readouterr()
     assert code == 1
     assert AuditLedger.load(ledger_path).records[-1]["event"] != "human_review"
+
+
+def approve(ledger_path, note):
+    return main(["approve", "--ledger", str(ledger_path), "--reviewer-role", "deployer", "--decision", "approve", "--note", note])
+
+
+def test_review_without_justification_is_refused(tmp_path, capsys):
+    main(["run", "--config", str(ROOT / "configs" / "default.yaml"), "--output", str(tmp_path)])
+    ledger_path = tmp_path / "audit_ledger.jsonl"
+    before = len(AuditLedger.load(ledger_path).records)
+    assert approve(ledger_path, "   ") == 1
+    capsys.readouterr()
+    assert len(AuditLedger.load(ledger_path).records) == before
+
+
+def test_successive_reviews_accumulate_and_extend_the_audit(tmp_path, capsys):
+    main(["run", "--config", str(ROOT / "configs" / "default.yaml"), "--output", str(tmp_path)])
+    ledger_path = tmp_path / "audit_ledger.jsonl"
+    base_path = tmp_path / "base.jsonl"
+    base_path.write_text(ledger_path.read_text(encoding="utf-8"), encoding="utf-8")
+    base_count = len(AuditLedger.load(base_path).records)
+    assert approve(ledger_path, "First review") == 0
+    assert approve(ledger_path, "Second review") == 0
+    capsys.readouterr()
+    ledger = AuditLedger.load(ledger_path)
+    assert len(ledger.records) == base_count + 2
+    assert [r["payload"]["note"] for r in ledger.records[-2:]] == ["First review", "Second review"]
+    assert main(["verify", "--ledger", str(ledger_path), "--extends", str(base_path)]) == 0
+    assert json.loads(capsys.readouterr().out)["extends_base"] is True
+    review = load_workbook(tmp_path / "eaa_ai_audit_report.xlsx")["Human review"]
+    assert review.max_row == 3
+    other = tmp_path / "other"
+    main(["run", "--config", str(ROOT / "configs" / "default.yaml"), "--output", str(other)])
+    capsys.readouterr()
+    assert main(["verify", "--ledger", str(ledger_path), "--extends", str(other / "audit_ledger.jsonl")]) == 1
+    assert json.loads(capsys.readouterr().out)["extends_base"] is False

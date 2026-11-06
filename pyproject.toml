@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "eaa-ai"
-version = "0.1.0"
+version = "1.0.0"
 description = "Explainable Accountability-Aware AI Architecture: fairness-constrained learning with SHAP explanations, a hash-chained audit ledger and an EU AI Act oriented deployment gate."
 readme = "README.md"
 requires-python = ">=3.10"

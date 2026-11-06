@@ -3,6 +3,8 @@
 [![CI](../../actions/workflows/ci.yml/badge.svg)](../../actions/workflows/ci.yml)
 [![Accountability audit](../../actions/workflows/audit.yml/badge.svg)](../../actions/workflows/audit.yml)
 
+**Dimitrios Sargiotis** · School of Civil Engineering, National Technical University of Athens · [ORCID 0009-0006-3644-4561](https://orcid.org/0009-0006-3644-4561) · [users.ntua.gr/dims](https://users.ntua.gr/dims/)
+
 Reference implementation of the Explainable Accountability-Aware AI Architecture introduced in
 
 > Sargiotis, D. (2026). *Empathy in Algorithms: Shaping Ethical AI for a Just and Inclusive Society*. Springer Nature. §8.4 (EAA-AI) and §9.4 (XAI-AAI). https://doi.org/10.1007/978-3-032-32128-2
@@ -91,7 +93,7 @@ Nothing needs to be run locally.
 
 - **CI** runs the test suite on Python 3.10 to 3.13 on every push and pull request.
 - **Accountability audit** runs on every push to `main`, every Monday at 05:17 UTC and on demand (Actions → Accountability audit → Run workflow). It trains the governed model with `--strict`, trains an unconstrained baseline for comparison, repeats both on real ACS data, verifies the ledgers, writes the results table to the run summary and uploads all outputs as the `eaa-ai-audit` artifact.
-- **Human review** (Actions → Human review → Run workflow) takes the run ID of an audit, a decision and a justification, appends a `human_review` record to that run's ledger, re-verifies the chain, shows the decision, the accountable role, the justification and the hash of the approved model on the run summary page, adds a **Human review** sheet to the Excel report and brings its ledger and summary sheets up to date, and stores the reviewed outputs for 365 days. A review is refused if the ledger fails verification.
+- **Human review** (Actions → Human review → Run workflow) takes the run ID of an audit, a decision and a justification, requires a written justification, continues from the most recent review of the same audit so that successive reviews accumulate in one chain, checks that the chain still extends the original audit ledger record for record, appends a `human_review` record, re-verifies the chain, shows the decision, the accountable role, the justification and the hash of the approved model on the run summary page, adds a **Human review** sheet to the Excel report and brings its ledger and summary sheets up to date, and stores the reviewed outputs for 365 days. A review is refused if the ledger fails verification.
 
 On the synthetic data (60,000 records with a deliberately strong historical bias) the governed model selects $`\lambda = 1`$ and passes every requirement, while the unconstrained baseline is blocked with a disparate impact ratio of 0.766 (95% CI 0.730 to 0.806). The governed model passes on point estimates but with thin margins (disparate impact ratio 0.808, 95% CI 0.767 to 0.851; equalized odds difference 0.1496 against a limit of 0.15), which the confidence intervals make explicit rather than hide. An earlier version with 6,000 records appeared to separate the two models more sharply; at that sample size the difference was within sampling noise.
 
@@ -125,6 +127,14 @@ Set `data.source` to `file`, point `data.path` to an `.xlsx` or `.csv` table, an
 ## Limitations
 
 The default configuration uses synthetic data; the ACS configuration uses real survey microdata from one US state and year, so its results describe that population and should not be generalised to European public services without validation on European data. The exact SHAP explainer applies to the linear model; non-linear or generative models need a model-agnostic explainer or the counterfactual regulariser of CER-GAI (§8.4). When historical labels are themselves biased, demographic parity and equalized odds pull in opposite directions; raising `historical_bias` in the configuration makes this trade-off visible, and the gate will then block deployment rather than hide it. Passing the gate supports, but does not by itself constitute, a conformity assessment under the AI Act.
+
+## Citation
+
+Please cite both the software and the book. Each GitHub release of this repository is archived on Zenodo with its own DOI, linked to the book as a supplement; GitHub's **Cite this repository** button reads `CITATION.cff`.
+
+> Sargiotis, D. (2026). *EAA-AI: reference implementation of the Explainable Accountability-Aware AI Architecture from Empathy in Algorithms* (Version 1.0.0) [Computer software]. https://github.com/uomoathens/eaa-ai
+
+> Sargiotis, D. (2026). *Empathy in Algorithms: Shaping Ethical AI for a Just and Inclusive Society*. Springer Nature Switzerland. https://doi.org/10.1007/978-3-032-32128-2
 
 ## Licence
 

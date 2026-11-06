@@ -1,0 +1,46 @@
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below, together with the book whose architecture it implements."
+title: "EAA-AI: reference implementation of the Explainable Accountability-Aware AI Architecture from Empathy in Algorithms"
+type: software
+version: "1.0.0"
+date-released: "2026-11-06"
+authors:
+  - family-names: Sargiotis
+    given-names: Dimitrios
+    affiliation: "School of Civil Engineering, National Technical University of Athens"
+    orcid: "https://orcid.org/0009-0006-3644-4561"
+repository-code: "https://github.com/uomoathens/eaa-ai"
+abstract: >-
+  Runnable, tested implementation of the Explainable Accountability-Aware AI
+  Architecture (EAA-AI) introduced in Empathy in Algorithms (Springer, 2026).
+  It combines fairness-constrained learning, exact SHAP explanations, a
+  hash-chained audit ledger with role-based accountability, a deployment gate
+  oriented to the high-risk obligations of the EU AI Act, confidence-aware
+  selection of the fairness weight with bootstrap intervals, and recorded
+  human review. It is evaluated on synthetic public-benefit data and on the
+  ACSPublicCoverage task built from US Census microdata.
+keywords:
+  - responsible AI
+  - algorithmic fairness
+  - explainable AI
+  - SHAP
+  - accountability
+  - audit trail
+  - EU AI Act
+  - public policy
+  - human oversight
+  - folktables
+license: MIT
+references:
+  - type: book
+    title: "Empathy in Algorithms: Shaping Ethical AI for a Just and Inclusive Society"
+    authors:
+      - family-names: Sargiotis
+        given-names: Dimitrios
+        orcid: "https://orcid.org/0009-0006-3644-4561"
+    publisher:
+      name: "Springer Nature Switzerland"
+    collection-title: "AI for Human-Centric Cities: Advancing Health, Inclusion, and Urban Well-Being"
+    year: 2026
+    doi: "10.1007/978-3-032-32128-2"
+    isbn: "978-3-032-32128-2"

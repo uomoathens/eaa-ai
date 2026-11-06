@@ -101,14 +101,27 @@ def command_run(arguments):
     return 0
 
 
+def extends(ledger, base):
+    if len(base.records) > len(ledger.records):
+        return False
+    return all(a["hash"] == b["hash"] for a, b in zip(base.records, ledger.records))
+
+
 def command_verify(arguments):
     ledger = AuditLedger.load(arguments.ledger)
     verified, position = ledger.verify()
-    print(json.dumps({"verified": verified, "records": len(ledger.records), "broken_at": position, "head": ledger.head}))
+    result = {"verified": verified, "records": len(ledger.records), "broken_at": position, "head": ledger.head}
+    if arguments.extends:
+        result["extends_base"] = extends(ledger, AuditLedger.load(arguments.extends))
+        verified = verified and result["extends_base"]
+    print(json.dumps(result))
     return 0 if verified else 1
 
 
 def command_approve(arguments):
+    if not arguments.note.strip():
+        print(json.dumps({"error": "a justification is required for every human review"}))
+        return 1
     ledger = AuditLedger.load(arguments.ledger)
     verified, position = ledger.verify()
     if not verified:
@@ -140,7 +153,7 @@ def command_approve(arguments):
 
 
 def write_review_summary(path, ledger, record, decision, verified):
-    note = " ".join((record["payload"]["note"] or "None given").split()).replace("|", "\\|")
+    note = " ".join(record["payload"]["note"].split()).replace("|", "\\|")
     lines = [
         "## EAA-AI human review",
         "",
@@ -175,13 +188,14 @@ def build_parser():
     run.set_defaults(handler=command_run)
     verify = commands.add_parser("verify")
     verify.add_argument("--ledger", default="outputs/audit_ledger.jsonl")
+    verify.add_argument("--extends", default=None)
     verify.set_defaults(handler=command_verify)
     approve = commands.add_parser("approve")
     approve.add_argument("--ledger", default="outputs/audit_ledger.jsonl")
     approve.add_argument("--reviewer-role", required=True)
     approve.add_argument("--reviewer-unit", default="oversight")
     approve.add_argument("--decision", choices=["approve", "reject"], required=True)
-    approve.add_argument("--note", default="")
+    approve.add_argument("--note", required=True)
     approve.add_argument("--summary", default=None)
     approve.set_defaults(handler=command_approve)
     return parser
