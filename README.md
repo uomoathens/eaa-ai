@@ -32,21 +32,27 @@ Every training run of a public-service decision model (the bundled example is el
 
 The learner is a fairness-regularised logistic regression with the governance loss of the book (EGAPF, §1.1):
 
-$$L_{\text{total}} = L_{\text{task}} + \lambda \, L_{\text{fair}} + \beta \, L_{\text{explain}}$$
+```math
+L_{\text{total}} = L_{\text{task}} + \lambda L_{\text{fair}} + \beta L_{\text{explain}}
+```
 
 ## Refinements over the published formulation
 
-**1. Attribution moved out of the parameter arithmetic.** The book writes $\theta^{*} = \theta_{0} + \sum_{t} \Delta_{t} \cdot I_{d_t}$, in which an indicator would zero out unattributed updates. Here the parameters evolve as $\theta^{*} = \theta_{0} + \sum_{t} \Delta_{t}$ and attribution lives in a hash-chained ledger:
+**1. Attribution moved out of the parameter arithmetic.** The book writes $`\theta^{*} = \theta_{0} + \sum_{t} \Delta_{t} \cdot I_{d_t}`$, in which an indicator would zero out unattributed updates. Here the parameters evolve as $`\theta^{*} = \theta_{0} + \sum_{t} \Delta_{t}`$ and attribution lives in a hash-chained ledger:
 
-$$\mathcal{L}_{\text{audit}} = \left\{ \left( t,\ h(\Delta_t),\ d_t,\ h(\mathcal{D}_t),\ C_{\text{ethics}}(\theta_t) \right) \right\}_{t=1}^{T}, \quad h_t = H\!\left(h_{t-1} \,\|\, \text{record}_t\right)$$
+```math
+\mathcal{L}_{\text{audit}} = \left\{ \left( t,\ h(\Delta_t),\ d_t,\ h(\mathcal{D}_t),\ C_{\text{ethics}}(\theta_t) \right) \right\}_{t=1}^{T}, \quad h_t = H\left(h_{t-1} \,\|\, \text{record}_t\right)
+```
 
 Any edited, inserted or deleted record breaks verification (AI Act, Article 12).
 
-**2. Continuous compliance penalty and hard deployment gate.** The binary bonus $\gamma_2 C_{\text{ethics}}$ rewards barely crossing a threshold and is blind to the size of a violation. Both rewards are computed and logged; the refined one is
+**2. Continuous compliance penalty and hard deployment gate.** The binary bonus $`\gamma_2 C_{\text{ethics}}`$ rewards barely crossing a threshold and is blind to the size of a violation. Both rewards are computed and logged; the refined one is
 
-$$R(s_t,a_t) = U_{\text{task}}(a_t) - \gamma_1 L_{\text{bias}}(a_t) - \gamma_2 \sum_{m} \max\!\left(0,\ \tau_m - m(\theta_t)\right)$$
+```math
+R(s_t,a_t) = U_{\text{task}}(a_t) - \gamma_1 L_{\text{bias}}(a_t) - \gamma_2 \sum_{m} \max\left(0,\ \tau_m - m(\theta_t)\right)
+```
 
-and deployment requires $\min_m (m(\theta_t) - \tau_m) \ge 0$ on held-out data. If the final iteration fails, the model is rolled back to the last compliant iteration and the rollback is recorded.
+and deployment requires $`\min_m (m(\theta_t) - \tau_m) \ge 0`$ on held-out data. If the final iteration fails, the model is rolled back to the last compliant iteration and the rollback is recorded.
 
 **3. Proxy-aware explanation metric.** `sensitive_attribution_share` measures how much of the SHAP mass falls on the protected attribute and on declared proxies (here `rural_region`), so a model that is blind to the attribute but leans on a proxy is still caught.
 
