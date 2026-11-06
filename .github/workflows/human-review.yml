@@ -1,0 +1,60 @@
+name: Human review
+
+on:
+  workflow_dispatch:
+    inputs:
+      audit_run_id:
+        description: Run ID of the Accountability audit workflow to review
+        required: true
+      decision:
+        description: Review decision
+        type: choice
+        options: [approve, reject]
+        required: true
+      reviewer_role:
+        description: Accountable role under the AI Act
+        type: choice
+        options: [deployer, provider, oversight-board]
+        default: deployer
+        required: true
+      note:
+        description: Justification recorded in the ledger
+        required: false
+        default: ""
+
+permissions:
+  contents: read
+  actions: read
+
+jobs:
+  review:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+      - uses: actions/download-artifact@v4
+        with:
+          name: eaa-ai-audit
+          path: outputs/
+          run-id: ${{ inputs.audit_run_id }}
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+      - name: Record human review in the ledger
+        env:
+          NOTE: ${{ inputs.note }}
+        run: >
+          eaa-ai approve
+          --ledger outputs/governed/audit_ledger.jsonl
+          --reviewer-role "${{ inputs.reviewer_role }}"
+          --reviewer-unit "${{ github.actor }}"
+          --decision "${{ inputs.decision }}"
+          --note "$NOTE"
+      - run: eaa-ai verify --ledger outputs/governed/audit_ledger.jsonl
+      - uses: actions/upload-artifact@v4
+        with:
+          name: eaa-ai-reviewed-${{ inputs.audit_run_id }}
+          path: outputs/governed/
+          retention-days: 365

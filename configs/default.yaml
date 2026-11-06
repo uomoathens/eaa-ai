@@ -1,0 +1,50 @@
+actor:
+  role: provider
+  unit: ml-engineering
+
+data:
+  source: synthetic
+  target: eligible
+  sensitive: protected_group
+  split_seed: 7
+  synthetic:
+    n_samples: 6000
+    historical_bias: 0.4
+    proxy_strength: 0.7
+    seed: 7
+
+proxy_features:
+  - rural_region
+
+model:
+  iterations: 400
+  learning_rate: 0.2
+  fairness_weight: 30.0
+  explain_weight: 0.002
+  threshold: 0.5
+  blind_features:
+    - protected_group
+
+reward:
+  gamma_bias: 1.0
+  gamma_ethics: 0.5
+
+policy:
+  accuracy:
+    threshold: 0.75
+    direction: min
+  abs_statistical_parity_difference:
+    threshold: 0.10
+    direction: max
+  disparate_impact_ratio:
+    threshold: 0.80
+    direction: min
+  equalized_odds_difference:
+    threshold: 0.15
+    direction: max
+  counterfactual_flip_rate:
+    threshold: 0.10
+    direction: max
+  sensitive_attribution_share:
+    threshold: 0.20
+    direction: max

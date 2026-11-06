@@ -1,0 +1,128 @@
+from pathlib import Path
+
+import pandas as pd
+from openpyxl.styles import Alignment, Font, PatternFill
+from openpyxl.utils import get_column_letter
+
+HEADER_FILL = PatternFill("solid", fgColor="1F3864")
+HEADER_FONT = Font(bold=True, color="FFFFFF")
+PASS_FILL = PatternFill("solid", fgColor="E2EFDA")
+FAIL_FILL = PatternFill("solid", fgColor="FCE4D6")
+
+
+def _summary_frame(result, verified):
+    rows = [
+        ("Selected iteration", result.selected_iteration),
+        ("Rolled back to last compliant iteration", "Yes" if result.rolled_back else "No"),
+        ("Deployable on test set", "Yes" if result.deployable else "No"),
+        ("Violations on test set", ", ".join(result.test_compliance["violations"]) or "No violations"),
+        ("Hinge penalty on test set", round(result.test_compliance["hinge_penalty"], 6)),
+        ("Ledger records", len(result.ledger.records)),
+        ("Ledger integrity", "Verified" if verified else "BROKEN"),
+        ("Ledger head hash", result.ledger.head),
+        ("Accountable role", result.config["actor"]["role"]),
+        ("Accountable unit", result.config["actor"]["unit"]),
+        ("Human approval", "Required before deployment"),
+    ]
+    return pd.DataFrame(rows, columns=["Item", "Value"])
+
+
+def _requirements_frame(result):
+    rows = []
+    for name, spec in result.config["policy"].items():
+        value = result.test_metrics[name]
+        margin = result.test_compliance["margins"][name]
+        rows.append(
+            {
+                "Metric": name,
+                "Rule": f"{'<=' if spec['direction'] == 'max' else '>='} {spec['threshold']}",
+                "Test value": round(value, 6),
+                "Margin": round(margin, 6),
+                "Status": "PASS" if margin >= 0 else "FAIL",
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _history_frame(result):
+    frame = pd.DataFrame(result.history)
+    frame["violations"] = frame["violations"].apply(lambda items: ", ".join(items))
+    return frame.drop(columns=["margins"])
+
+
+def _ledger_frame(result):
+    rows = []
+    for record in result.ledger.records:
+        payload = record["payload"]
+        rows.append(
+            {
+                "index": record["index"],
+                "timestamp": record["timestamp"],
+                "event": record["event"],
+                "role": record["actor"].get("role"),
+                "unit": record["actor"].get("unit"),
+                "iteration": payload.get("iteration", payload.get("selected_iteration")),
+                "flagged": payload.get("flagged"),
+                "parameters_hash": payload.get("parameters_hash"),
+                "previous_hash": record["previous_hash"],
+                "hash": record["hash"],
+            }
+        )
+    return pd.DataFrame(rows)
+
+
+def _importance_frame(result):
+    return pd.DataFrame(result.explanation.global_importance(), columns=["Feature", "Mean |SHAP|"])
+
+
+def _cases_frame(result, test, limit):
+    probabilities = result.model.predict_proba(test.features)
+    rows = []
+    for row in range(min(limit, len(test.labels))):
+        top = result.explanation.top_k(row, 3)
+        entry = {
+            "case": row,
+            "decision": "Eligible" if probabilities[row] >= result.model.threshold else "Not eligible",
+            "probability": round(float(probabilities[row]), 4),
+        }
+        for rank, (feature, value) in enumerate(top, start=1):
+            entry[f"reason_{rank}"] = feature
+            entry[f"contribution_{rank}"] = round(value, 4)
+        rows.append(entry)
+    return pd.DataFrame(rows)
+
+
+def _format(sheet):
+    for cell in sheet[1]:
+        cell.fill = HEADER_FILL
+        cell.font = HEADER_FONT
+        cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+    sheet.freeze_panes = "A2"
+    for index, column in enumerate(sheet.columns, start=1):
+        width = max(len(str(cell.value)) if cell.value is not None else 0 for cell in column)
+        sheet.column_dimensions[get_column_letter(index)].width = min(max(12, width + 2), 70)
+
+
+def write_report(result, test, path, verified, case_limit=200):
+    target = Path(path)
+    target.parent.mkdir(parents=True, exist_ok=True)
+    sheets = {
+        "Summary": _summary_frame(result, verified),
+        "Requirements": _requirements_frame(result),
+        "Training history": _history_frame(result),
+        "Audit ledger": _ledger_frame(result),
+        "Global explanation": _importance_frame(result),
+        "Case explanations": _cases_frame(result, test, case_limit),
+    }
+    with pd.ExcelWriter(target, engine="openpyxl") as writer:
+        for name, frame in sheets.items():
+            frame.to_excel(writer, sheet_name=name, index=False)
+        for name in sheets:
+            _format(writer.sheets[name])
+        requirements = writer.sheets["Requirements"]
+        for row in range(2, requirements.max_row + 1):
+            status = requirements.cell(row=row, column=5)
+            fill = PASS_FILL if status.value == "PASS" else FAIL_FILL
+            for column in range(1, 6):
+                requirements.cell(row=row, column=column).fill = fill
+    return target

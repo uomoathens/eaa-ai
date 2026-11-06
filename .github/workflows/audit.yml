@@ -1,0 +1,43 @@
+name: Accountability audit
+
+on:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 5 * * 1"
+  workflow_dispatch:
+    inputs:
+      config:
+        description: Configuration file to audit
+        default: configs/default.yaml
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  audit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+      - run: pip install -e .
+      - name: Run governed training
+        env:
+          CONFIG: ${{ inputs.config || 'configs/default.yaml' }}
+        run: eaa-ai run --config "$CONFIG" --output outputs/governed --summary "$GITHUB_STEP_SUMMARY" --strict
+      - name: Run unconstrained baseline for comparison
+        if: always()
+        run: eaa-ai run --config configs/baseline.yaml --output outputs/baseline --summary "$GITHUB_STEP_SUMMARY"
+      - name: Verify ledger integrity
+        if: always()
+        run: eaa-ai verify --ledger outputs/governed/audit_ledger.jsonl
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: eaa-ai-audit
+          path: outputs/
+          retention-days: 90
