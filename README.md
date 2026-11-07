@@ -11,6 +11,12 @@ Reference implementation of the Explainable Accountability-Aware AI Architecture
 
 Building on the architecture defined in the book, the repository develops it into runnable, testable software and extends it along five operational directions aimed at the high-risk obligations of the EU AI Act (Regulation (EU) 2024/1689), which apply to stand-alone Annex III systems from 2 December 2027 following the Digital Omnibus on AI.
 
+## Why it matters
+
+Public bodies increasingly rely on AI for decisions about people: access to benefits, insurance, credit or education. Under the EU AI Act, such stand-alone high-risk systems must meet requirements on record-keeping, transparency, human oversight and the right to an explanation of individual decisions, applicable from [2 December 2027](https://casrai.org/news/digital-omnibus-ai-act). This repository shows, end to end and on real survey data, how a decision model can meet these requirements in practice: every decision is explained, every training step is attributable to an accountable role, and deployment is gated on fairness and on a recorded human approval.
+
+Its results also carry a methodological lesson for anyone auditing such systems. On real data, the strength of a fairness constraint is best set from the data and with statistical confidence rather than fixed in advance: where no bias is present, a fixed constraint can move decisions in the wrong direction, and without confidence intervals a model can appear compliant on the strength of sampling noise alone. The repository is offered as a reference for public authorities, auditors and researchers.
+
 ## What it does
 
 Every training run of a public-service decision model (the bundled example is eligibility for a public benefit) produces:
